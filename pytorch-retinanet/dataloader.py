@@ -16,12 +16,12 @@ import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
 
-from PIL import Image
 import numpy as np
-from encoder import DataEncoder
+from PIL import Image
 from sklearn.preprocessing import LabelEncoder
 from transform import resize, random_flip, random_crop, center_crop
-
+from encoder import DataEncoder
+from parameters import params
 
 class ListDataset(data.Dataset):
     def __init__(self, root, train, transform, input_size):
@@ -68,7 +68,7 @@ class ListDataset(data.Dataset):
         if img.mode != 'RGB':
             img = img.convert('RGB')
 
-        boxes = torch.Tensor(self.boxes[idx]).clone()
+        boxes = torch.Tensor(self.boxes[idx]).clone() * self.input_size
         labels = torch.LongTensor(self.labels[idx])
         size = self.input_size
         # Data augmentation.
@@ -106,7 +106,7 @@ class ListDataset(data.Dataset):
         cls_targets = []
         for i in range(num_imgs):
             inputs[i] = imgs[i]
-            loc_target, cls_target = self.encoder.encode(boxes[i], labels[i], input_size=(w,h))
+            loc_target, cls_target = self.encoder.encode(boxes[i], labels[i], input_size=(w, h))
             loc_targets.append(loc_target)
             cls_targets.append(cls_target)
         return inputs, torch.stack(loc_targets), torch.stack(cls_targets)
@@ -115,7 +115,7 @@ class ListDataset(data.Dataset):
         return self.num_samples
 
 
-def provider(mode='train'):
+def provider(mode='train', batch_size=params['batch_size']):
 
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -129,11 +129,11 @@ def provider(mode='train'):
         root=root,
         train=mode=='train',
         transform=transform,
-        input_size=600
+        input_size=params['input_size']
     )
     dataloader = torch.utils.data.DataLoader(
         dataset,
-        batch_size=6,
+        batch_size=batch_size,
         shuffle=True,
         num_workers=4,
         collate_fn=dataset.collate_fn

@@ -2,6 +2,7 @@ from __future__ import print_function
 
 import os
 import argparse
+import pdb
 
 import torch
 import torch.nn as nn
@@ -28,12 +29,8 @@ assert torch.cuda.is_available(), 'Error: CUDA not found!'
 best_loss = float('inf')  # best val loss
 start_epoch = 0  # start from epoch 0 or last epoch
 
-# Data
-print('==> Preparing data..')
-trainloader = provider(mode='train')
-valloader = provider(mode='val')
-
 # Model
+print('==> Preparing Model..')
 net = RetinaNet()
 net.load_state_dict(torch.load('./model/net.pth'))
 if args.resume:
@@ -52,9 +49,11 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=1
 # Training
 def train(epoch):
     print('\nEpoch: %d' % epoch)
+    trainloader = provider(mode='train', batch_size=8)
     net.train()
     net.module.freeze_bn()
     train_loss = 0
+    total_iterations = len(trainloader)
     for batch_idx, (inputs, loc_targets, cls_targets) in enumerate(trainloader):
         inputs = Variable(inputs.cuda())
         loc_targets = Variable(loc_targets.cuda())
@@ -67,22 +66,35 @@ def train(epoch):
         optimizer.step()
 
         train_loss += loss.item()
-        print('train_loss: %.3f | avg_loss: %.3f' % (loss.item(), train_loss/(batch_idx+1)))
+        print('train_loss: %.3f | avg_loss: %.3f | %d/%d' % (
+            loss.item(),
+            train_loss/(batch_idx+1),
+            batch_idx,
+            total_iterations)
+        )
+    trainloader = None
 
 # val
 def val(epoch):
     print('\nval')
+    valloader = provider(mode='val', batch_size=4)
     net.eval()
     val_loss = 0
+    total_iterations = len(valloader)
     for batch_idx, (inputs, loc_targets, cls_targets) in enumerate(valloader):
-        inputs = Variable(inputs.cuda(), volatile=True)
+        inputs = Variable(inputs.cuda())
         loc_targets = Variable(loc_targets.cuda())
         cls_targets = Variable(cls_targets.cuda())
 
         loc_preds, cls_preds = net(inputs)
         loss = criterion(loc_preds, loc_targets, cls_preds, cls_targets)
         val_loss += loss.item()
-        print('val_loss: %.3f | avg_loss: %.3f' % (loss.item(), val_loss/(batch_idx+1)))
+        print('val_loss: %.3f | avg_loss: %.3f | %d/%d' % (
+            loss.item(),
+            val_loss/(batch_idx+1),
+            batch_idx,
+            total_iterations)
+        )
 
     # Save checkpoint
     global best_loss
@@ -96,10 +108,26 @@ def val(epoch):
         }
         if not os.path.isdir('checkpoint'):
             os.mkdir('checkpoint')
-        torch.save(state, './checkpoint/ckpt.pth')
+        torch.save(state, './checkpoint/model%d.pth' % epoch)
         best_loss = val_loss
+    valloader = None
+
+def save_state(epoch):
+    state = {
+            'net': net.module.state_dict(),
+            'epoch': epoch,
+        }
+    torch.save(state, './checkpoint/ckpt%d.pth' % epoch)
 
 
-for epoch in range(start_epoch, start_epoch+200):
-    train(epoch)
-    val(epoch)
+for epoch in range(start_epoch, start_epoch+20):
+    try:
+        train(epoch)
+        save_state(epoch)
+        val(epoch)
+    except KeyboardInterrupt as e:
+        print(e)
+        save_state(epoch)
+        pdb.set_trace()
+    except Exception as e:
+        pdb.set_trace()

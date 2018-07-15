@@ -88,7 +88,7 @@ class FPN(nn.Module):
 
         So we choose bilinear upsample which supports arbitrary output sizes.
         '''
-        _,_,H,W = y.size()
+        _, _, H, W = y.size()
         return F.upsample(x, size=(H,W), mode='bilinear', align_corners=True) + y
 
     def forward(self, x):
@@ -113,14 +113,15 @@ class FPN(nn.Module):
 def FPN50():
     return FPN(Bottleneck, [3,4,6,3])
 
+
 def FPN101():
     return FPN(Bottleneck, [2,4,23,3])
 
 
-def test():
+if __name__ == '__main__':
+    from parameters import params
     net = FPN50()
-    fms = net(Variable(torch.randn(1,3,600,300)))
+    input_size = params['input_size']
+    fms = net(Variable(torch.randn(1,3, input_size, input_size)))
     for fm in fms:
         print(fm.size())
-
-# test()

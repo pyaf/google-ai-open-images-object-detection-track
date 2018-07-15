@@ -1,21 +1,21 @@
 import math
 import torch
 import torch.nn as nn
-
-from fpn import FPN50
 from torch.autograd import Variable
 import torch.nn.init as init
 
+from fpn import FPN50
+from parameters import params
 
 class RetinaNet(nn.Module):
-    num_anchors = 9
+    num_anchors = params['num_anchors']
     
-    def __init__(self, num_classes=20):
+    def __init__(self, num_classes=params['num_classes']):
         super(RetinaNet, self).__init__()
         self.fpn = FPN50()
         self.num_classes = num_classes
-        self.loc_head = self._make_head(self.num_anchors*4)
-        self.cls_head = self._make_head(self.num_anchors*self.num_classes)
+        self.loc_head = self._make_head(self.num_anchors * 4)
+        self.cls_head = self._make_head(self.num_anchors * self.num_classes)
         pi = 0.01
         init.constant_(self.cls_head[-1].bias, -math.log((1-pi)/pi))
 
@@ -26,11 +26,11 @@ class RetinaNet(nn.Module):
         for fm in fms:
             loc_pred = self.loc_head(fm)
             cls_pred = self.cls_head(fm)
-            loc_pred = loc_pred.permute(0,2,3,1).contiguous().view(x.size(0),-1,4)                 # [N, 9*4,H,W] -> [N,H,W, 9*4] -> [N,H*W*9, 4]
-            cls_pred = cls_pred.permute(0,2,3,1).contiguous().view(x.size(0),-1,self.num_classes)  # [N,9*20,H,W] -> [N,H,W,9*20] -> [N,H*W*9,20]
+            loc_pred = loc_pred.permute(0, 2, 3, 1).contiguous().view(x.size(0), -1, 4)                 # [N, 9*4,H,W] -> [N,H,W, 9*4] -> [N,H*W*9, 4]
+            cls_pred = cls_pred.permute(0, 2, 3, 1).contiguous().view(x.size(0), -1, self.num_classes)  # [N,9*20,H,W] -> [N,H,W,9*20] -> [N,H*W*9,20]
             loc_preds.append(loc_pred)
             cls_preds.append(cls_pred)
-        return torch.cat(loc_preds,1), torch.cat(cls_preds,1)
+        return torch.cat(loc_preds, 1), torch.cat(cls_preds, 1)
 
     def _make_head(self, out_planes):
         layers = []
@@ -48,7 +48,7 @@ class RetinaNet(nn.Module):
 
 def test():
     net = RetinaNet()
-    loc_preds, cls_preds = net(Variable(torch.randn(2,3,224,224)))
+    loc_preds, cls_preds = net(Variable(torch.randn(2, 3, 224, 224)))
     print(loc_preds.size())
     print(cls_preds.size())
     loc_grads = Variable(torch.randn(loc_preds.size()))

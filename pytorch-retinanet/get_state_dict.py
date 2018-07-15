@@ -36,5 +36,5 @@ pi = 0.01
 init.constant_(net.cls_head[-1].bias, -math.log((1-pi)/pi))
 
 net.fpn.load_state_dict(dd)
-torch.save(net.state_dict(), '.model/net.pth')
+torch.save(net.state_dict(), './model/net.pth')
 print('Done!')

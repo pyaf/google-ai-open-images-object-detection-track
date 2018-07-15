@@ -3,13 +3,13 @@ from __future__ import print_function
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-from utils import one_hot_embedding
 from torch.autograd import Variable
 
+from utils import one_hot_embedding
+from parameters import params
 
 class FocalLoss(nn.Module):
-    def __init__(self, num_classes=20):
+    def __init__(self, num_classes=params['num_classes']):
         super(FocalLoss, self).__init__()
         self.num_classes = num_classes
 
@@ -23,8 +23,8 @@ class FocalLoss(nn.Module):
         Return:
           (tensor) focal loss.
         '''
-        alpha = 0.25
-        gamma = 2
+        alpha = params['alpha']
+        gamma = params['gamma']
 
         t = one_hot_embedding(y.data.cpu(), 1+self.num_classes)  # [N,21]
         t = t[:,1:]  # exclude background
@@ -46,7 +46,7 @@ class FocalLoss(nn.Module):
         Return:
           (tensor) focal loss.
         '''
-        alpha = 0.25
+        alpha = params['alpha']
 
         t = one_hot_embedding(y.data.cpu(), 1+self.num_classes)
         t = t[:,1:]
@@ -91,11 +91,12 @@ class FocalLoss(nn.Module):
         masked_cls_preds = cls_preds[mask].view(-1, self.num_classes)
         cls_loss = self.focal_loss_alt(masked_cls_preds, cls_targets[pos_neg])
         # import pdb; pdb.set_trace()
-        temp_num = num_pos if num_pos else 1
+        temp_num = num_pos.item() if num_pos.item() else 1
         print('num_pos: %d | loc_loss: %.3f | cls_loss: %.3f' % (
-            num_pos,
-            loc_loss.item()/temp_num,
-            cls_loss.item()/temp_num),
+                num_pos,
+                loc_loss.item()/temp_num,
+                cls_loss.item()/temp_num
+            ),
             end=' | ')
         loss = (loc_loss+cls_loss)/temp_num
         return loss

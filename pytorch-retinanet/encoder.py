@@ -3,14 +3,19 @@ import math
 import torch
 
 from utils import meshgrid, box_iou, box_nms, change_box_order
-
+from parameters import params
 
 class DataEncoder:
     def __init__(self):
-        self.anchor_areas = [4*4., 8*8., 16*16., 32*32., 64*64.]  # p3 -> p7
-        self.aspect_ratios = [1/2., 1/1., 2/1.]
-        self.scale_ratios = [1., pow(2,1/3.), pow(2,2/3.)]
+        self.anchor_areas = params['anchor_areas']  # p3 -> p7
+        self.aspect_ratios = params['aspect_ratios']
+        self.scale_ratios = params['scale_ratios']
         self.anchor_wh = self._get_anchor_wh()
+        input_size = torch.Tensor([
+            params['input_size'],
+            params['input_size']
+        ])
+        self.anchor_boxes = self._get_anchor_boxes(input_size)
 
     def _get_anchor_wh(self):
         '''Compute anchor width and height for each feature map.
@@ -41,14 +46,13 @@ class DataEncoder:
                         where #anchors = fmw * fmh * #anchors_per_cell
         '''
         # import pdb; pdb.set_trace()
-
         num_fms = len(self.anchor_areas)
         fm_sizes = [(input_size/pow(2., i+3)).ceil() for i in range(num_fms)]  # p3 -> p7 feature map sizes
 
         boxes = []
         for i in range(num_fms):
             fm_size = fm_sizes[i]
-            grid_size = (input_size / fm_size)#.type(torch.LongTensor)
+            grid_size = (input_size / fm_size)  
             fm_w, fm_h = int(fm_size[0]), int(fm_size[1])
             xy = meshgrid(fm_w, fm_h) + 0.5  # [fm_h*fm_w, 2]
             xy = (xy * grid_size).view(fm_h, fm_w, 1, 2).expand(fm_h, fm_w, 9, 2)
@@ -75,11 +79,7 @@ class DataEncoder:
           loc_targets: (tensor) encoded bounding boxes, sized [#anchors,4].
           cls_targets: (tensor) encoded class labels, sized [#anchors,].
         '''
-        if isinstance(input_size, int):
-            input_size = torch.Tensor([input_size, input_size])
-        else:
-            input_size = torch.Tensor(input_size)
-        anchor_boxes = self._get_anchor_boxes(input_size)
+        anchor_boxes = self.anchor_boxes
         boxes = change_box_order(boxes, 'xyxy2xywh')
 
         ious = box_iou(anchor_boxes, boxes, order='xywh')
@@ -90,9 +90,9 @@ class DataEncoder:
         loc_wh = torch.log(boxes[:, 2:]/anchor_boxes[:, 2:])
         loc_targets = torch.cat([loc_xy, loc_wh], 1)
         cls_targets = 1 + labels[max_ids]
-
-        cls_targets[max_ious < 0.3] = 0
-        ignore = (max_ious > 0.2) & (max_ious < 0.3)  # ignore ious between [0.4,0.5]
+        IOU_THRESH = params['IOU_THRESH']
+        cls_targets[max_ious < IOU_THRESH] = 0
+        ignore = (max_ious > 0.02) & (max_ious < IOU_THRESH)  # ignore ious between [0.4,0.5]
         cls_targets[ignore] = -1  # for now just mark ignored to -1
         return loc_targets, cls_targets
 
@@ -108,18 +108,15 @@ class DataEncoder:
           boxes: (tensor) decode box locations, sized [#obj,4].
           labels: (tensor) class labels for each box, sized [#obj,].
         '''
-        CLS_THRESH = 0.5
-        NMS_THRESH = 0.5
+        CLS_THRESH = params['CLS_THRESH']
+        NMS_THRESH = params['NMS_THRESH']
+        anchor_boxes = self.anchor_boxes
 
-        input_size = torch.Tensor([input_size,input_size]) if isinstance(input_size, int) \
-                     else torch.Tensor(input_size)
-        anchor_boxes = self._get_anchor_boxes(input_size)
+        loc_xy = loc_preds[:, :2]
+        loc_wh = loc_preds[:, 2:]
 
-        loc_xy = loc_preds[:,:2]
-        loc_wh = loc_preds[:,2:]
-
-        xy = loc_xy * anchor_boxes[:,2:] + anchor_boxes[:,:2]
-        wh = loc_wh.exp() * anchor_boxes[:,2:]
+        xy = loc_xy * anchor_boxes[:, 2:] + anchor_boxes[:, :2]
+        wh = loc_wh.exp() * anchor_boxes[:, 2:]
         boxes = torch.cat([xy-wh/2, xy+wh/2], 1)  # [#anchors,4]
 
         score, labels = cls_preds.sigmoid().max(1)          # [#anchors,]
