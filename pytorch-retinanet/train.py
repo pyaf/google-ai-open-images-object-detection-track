@@ -3,6 +3,7 @@ from __future__ import print_function
 import os
 import argparse
 import pdb
+import traceback
 
 import torch
 import torch.nn as nn
@@ -49,7 +50,7 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr, momentum=0.9, weight_decay=1
 # Training
 def train(epoch):
     print('\nEpoch: %d' % epoch)
-    trainloader = provider(mode='train', batch_size=8)
+    trainloader = provider(mode='train', batch_size=6)
     net.train()
     net.module.freeze_bn()
     train_loss = 0
@@ -128,6 +129,8 @@ for epoch in range(start_epoch, start_epoch+20):
     except KeyboardInterrupt as e:
         print(e)
         save_state(epoch)
+        traceback.print_exc()
         pdb.set_trace()
     except Exception as e:
+        traceback.print_exc()
         pdb.set_trace()

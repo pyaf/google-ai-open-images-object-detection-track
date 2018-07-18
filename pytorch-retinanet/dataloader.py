@@ -41,7 +41,6 @@ class ListDataset(data.Dataset):
         self.fnames = []
         self.boxes = []
         self.labels = []
-        self.class_le = LabelEncoder()
         self.encoder = DataEncoder()
         npy_path = 'train_npy' if train else 'val_npy'
         self.fnames = np.load(os.path.join(root, npy_path, 'fnames.npy'))
@@ -127,7 +126,7 @@ def provider(mode='train', batch_size=params['batch_size']):
     root = '../data/'
     dataset = ListDataset(
         root=root,
-        train=mode=='train',
+        train=mode == 'train',
         transform=transform,
         input_size=params['input_size']
     )

@@ -29,7 +29,7 @@ def main(root, cls_file, box_file, npy_path):
         label.append(class_le.transform([c])[0])
         filename = line[0] + '.jpg'
         if idx:  # don't append on first iteration
-            if current_file != filename or idx == len(box_file):
+            if current_file != filename or idx == len(box_file) - 1:
                 fnames.append(current_file)
                 boxes.append(box)
                 labels.append(label)
@@ -64,11 +64,11 @@ def main(root, cls_file, box_file, npy_path):
 
 if __name__ == '__main__':
     root = 'train'
-    cls_file = 'class-descriptions-boxable.csv'
-    box_file = 'train-annotations-bbox.csv'
+    cls_file = 'challenge-2018-class-descriptions-500.csv'
+    box_file = 'challenge-2018-train-annotations-bbox.csv'
     npy_path = 'train_npy'
     main(root, cls_file, box_file, npy_path)
     root = 'val'
-    box_file = 'validation-annotations-bbox.csv'
+    box_file = 'challenge-2018-image-ids-valset-od.csv'
     npy_path = 'val_npy'
     # main(root, cls_file, box_file, npy_path)

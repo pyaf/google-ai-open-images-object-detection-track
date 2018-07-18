@@ -1,7 +1,7 @@
 params = {}
 
 # general
-params['num_classes'] = 600
+params['num_classes'] = 601
 params['num_anchors'] = 9
 params['input_size'] = 256
 params['batch_size'] = 8

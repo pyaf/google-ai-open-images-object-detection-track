@@ -1,7 +1,7 @@
 '''Encode object boxes and labels.'''
 import math
 import torch
-
+import pdb, traceback
 from utils import meshgrid, box_iou, box_nms, change_box_order
 from parameters import params
 
@@ -96,31 +96,34 @@ class DataEncoder:
         cls_targets[ignore] = -1  # for now just mark ignored to -1
         return loc_targets, cls_targets
 
-    def decode(self, loc_preds, cls_preds, input_size):
+    def decode(self, loc_preds, cls_preds):
         '''Decode outputs back to bouding box locations and class labels.
 
         Args:
           loc_preds: (tensor) predicted locations, sized [#anchors, 4].
           cls_preds: (tensor) predicted class labels, sized [#anchors, #classes].
-          input_size: (int/tuple) model input size of (w,h).
 
         Returns:
           boxes: (tensor) decode box locations, sized [#obj,4].
           labels: (tensor) class labels for each box, sized [#obj,].
         '''
-        CLS_THRESH = params['CLS_THRESH']
-        NMS_THRESH = params['NMS_THRESH']
-        anchor_boxes = self.anchor_boxes
+        try:
+            CLS_THRESH = params['CLS_THRESH']
+            NMS_THRESH = params['NMS_THRESH']
+            anchor_boxes = self.anchor_boxes
 
-        loc_xy = loc_preds[:, :2]
-        loc_wh = loc_preds[:, 2:]
+            loc_xy = loc_preds[:, :2]
+            loc_wh = loc_preds[:, 2:]
 
-        xy = loc_xy * anchor_boxes[:, 2:] + anchor_boxes[:, :2]
-        wh = loc_wh.exp() * anchor_boxes[:, 2:]
-        boxes = torch.cat([xy-wh/2, xy+wh/2], 1)  # [#anchors,4]
+            xy = loc_xy * anchor_boxes[:, 2:] + anchor_boxes[:, :2]
+            wh = loc_wh.exp() * anchor_boxes[:, 2:]
+            boxes = torch.cat([xy-wh/2, xy+wh/2], 1)  # [#anchors,4]
 
-        score, labels = cls_preds.sigmoid().max(1)          # [#anchors,]
-        ids = score > CLS_THRESH
-        ids = ids.nonzero().squeeze()             # [#obj,]
-        keep = box_nms(boxes[ids], score[ids], threshold=NMS_THRESH)
-        return boxes[ids][keep], labels[ids][keep]
+            score, labels = cls_preds.sigmoid().max(1)          # [#anchors,]
+            ids = score > CLS_THRESH
+            ids = ids.nonzero().squeeze()             # [#obj,]
+            keep = box_nms(boxes[ids], score[ids], threshold=NMS_THRESH)
+            return boxes[ids][keep], labels[ids][keep]
+        except Exception as e:
+            traceback.print_exc()
+            pdb.set_trace()
